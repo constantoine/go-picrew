@@ -1,78 +1,100 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
 
-func main() {
-	ex, err := os.Executable()
+// Assets
+var (
+	Cheveux []image.Image
+	Peaux   []image.Image
+	Yeux    []image.Image
+	Shirts  []image.Image
+	Bouches []image.Image
+)
+
+func loadAssets(base string, imgs *[]image.Image) error {
+	files, err := ioutil.ReadDir(base)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	base := filepath.Dir(ex) + "/assets/"
-	boucheFile, err := os.Open(base + "bouche.png")
-	if err != nil {
-		panic(err)
+	for i := range files {
+		file, err := os.Open(filepath.Join(base, files[i].Name()))
+		if err != nil {
+			return err
+		}
+		img, _, err := image.Decode(file)
+		file.Close()
+		if err != nil {
+			fmt.Println(filepath.Join(base, files[i].Name()))
+			return err
+		}
+		*imgs = append(*imgs, img)
 	}
-	defer boucheFile.Close()
-	boucheImg, _, err := image.Decode(boucheFile)
-	if err != nil {
-		panic(err)
+	return nil
+}
+
+func loadAllAssets(base string) error {
+	if err := loadAssets(filepath.Join(base, "CHEVEUX"), &Cheveux); err != nil {
+		return err
 	}
-	cheveuxFile, err := os.Open(base + "cheveux.png")
-	if err != nil {
-		panic(err)
+	if err := loadAssets(filepath.Join(base, "PEAUX"), &Peaux); err != nil {
+		return err
 	}
-	defer cheveuxFile.Close()
-	cheveuxImg, _, err := image.Decode(cheveuxFile)
-	if err != nil {
-		panic(err)
+	if err := loadAssets(filepath.Join(base, "YEUX"), &Yeux); err != nil {
+		return err
 	}
-	nezFile, err := os.Open(base + "nez.png")
-	if err != nil {
-		panic(err)
+	if err := loadAssets(filepath.Join(base, "TEE-SHIRT"), &Shirts); err != nil {
+		return err
 	}
-	defer nezFile.Close()
-	nezImg, _, err := image.Decode(nezFile)
-	if err != nil {
-		panic(err)
+	if err := loadAssets(filepath.Join(base, "BOUCHES"), &Bouches); err != nil {
+		return err
 	}
-	teteFile, err := os.Open(base + "tete.png")
-	if err != nil {
-		panic(err)
-	}
-	defer teteFile.Close()
-	teteImg, _, err := image.Decode(teteFile)
-	if err != nil {
-		panic(err)
-	}
-	yeuxFile, err := os.Open(base + "yeux.png")
-	if err != nil {
-		panic(err)
-	}
-	defer yeuxFile.Close()
-	yeuxImg, _, err := image.Decode(yeuxFile)
-	if err != nil {
-		panic(err)
-	}
-	rec := image.Rect(0, 0, 350, 400)
+	return nil
+}
+
+func generate(base string, filename string, cheveuxID, peauxID, yeuxID, shirtsID, bouchesID int) error {
+	rec := image.Rect(0, 0, 512, 512)
 	finalImg := image.NewRGBA(rec)
-	draw.Draw(finalImg, rec, teteImg, rec.Min, draw.Src)
-	draw.Draw(finalImg, rec, boucheImg, rec.Min, draw.Over)
-	draw.Draw(finalImg, rec, nezImg, rec.Min, draw.Over)
-	draw.Draw(finalImg, rec, yeuxImg, rec.Min, draw.Over)
-	draw.Draw(finalImg, rec, cheveuxImg, rec.Min, draw.Over)
-	boucheImg.Bounds()
-	out, err := os.Create(base + "../output.png")
+	draw.Draw(finalImg, rec, Peaux[peauxID], rec.Min, draw.Src)
+	draw.Draw(finalImg, rec, Yeux[yeuxID], rec.Min, draw.Over)
+	draw.Draw(finalImg, rec, Bouches[bouchesID], rec.Min, draw.Over)
+	draw.Draw(finalImg, rec, Cheveux[cheveuxID], rec.Min, draw.Over)
+	draw.Draw(finalImg, rec, Shirts[shirtsID], rec.Min, draw.Over)
+	out, err := os.Create(filepath.Join(base, filename))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer out.Close()
 	if err := png.Encode(out, finalImg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func main() {
+	base := "/Users/crebert/cursus42/side_project/src/picrew/assets/"
+	if err := loadAllAssets(base); err != nil {
 		panic(err)
+	}
+	fmt.Printf("%d %d %d %d %d\n", len(Peaux), len(Yeux), len(Bouches), len(Cheveux), len(Shirts))
+	for peauxID := range Peaux {
+		for yeuxID := range Yeux {
+			for bouchesID := range Bouches {
+				for cheveuxID := range Cheveux {
+					for shirtsID := range Shirts {
+						if err := generate(base, fmt.Sprintf("../out/%d-%d-%d-%d-%d.png", peauxID, yeuxID, bouchesID, cheveuxID, shirtsID), cheveuxID, peauxID, yeuxID, shirtsID, bouchesID); err != nil {
+							panic(err)
+						}
+					}
+				}
+			}
+		}
 	}
 }
